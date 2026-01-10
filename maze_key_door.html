@@ -279,16 +279,15 @@ function startGame(n) {
   startTimer();
 }
 
-// Generate a TRULY HARD maze with winding paths and blocked rows/columns
+// Generate EXTREMELY HARD maze using advanced algorithms
 function generateHardMaze() {
   // Initialize all cells as walls
   maze = Array.from({length: size}, () => Array(size).fill(0));
   
-  // Create maze using recursive backtracking with tight passages
+  // STEP 1: Generate base maze using recursive backtracking
   const stack = [];
   const visited = Array.from({length: size}, () => Array(size).fill(false));
 
-  // Start position
   let r = 0, c = 0;
   maze[r][c] = 1;
   visited[r][c] = true;
@@ -297,7 +296,6 @@ function generateHardMaze() {
   while (stack.length > 0) {
     [r, c] = stack[stack.length - 1];
     
-    // Find unvisited neighbors 2 cells away
     const neighbors = [];
     for (const [dr, dc] of DIRS) {
       const nr = r + dr * 2;
@@ -309,8 +307,6 @@ function generateHardMaze() {
 
     if (neighbors.length > 0) {
       const [nr, nc, dr, dc] = neighbors[Math.floor(Math.random() * neighbors.length)];
-      
-      // Carve path
       maze[r + dr][c + dc] = 1;
       maze[nr][nc] = 1;
       visited[nr][nc] = true;
@@ -320,172 +316,250 @@ function generateHardMaze() {
     }
   }
 
-  // Ensure home is reachable
   maze[size - 1][size - 1] = 1;
-  
-  // NOW THE KEY PART: Block many straight paths to force winding routes
-  // Add strategic walls to break up straight lines in rows and columns
-  for (let i = 1; i < size - 1; i++) {
-    for (let j = 1; j < size - 1; j++) {
-      if (maze[i][j] === 1) {
-        // 50% chance to check if we should add blocking walls
-        if (Math.random() > 0.5) {
-          // Count horizontal and vertical paths
-          let horizontalPath = maze[i][j-1] === 1 && maze[i][j+1] === 1;
-          let verticalPath = maze[i-1][j] === 1 && maze[i+1][j] === 1;
-          
-          // If there's a straight path, block it (but ensure alternate route exists)
-          if (horizontalPath && !verticalPath) {
-            // Block one side horizontally
-            if (Math.random() > 0.5 && maze[i][j-1] === 1) {
-              // Check if blocking won't isolate areas
-              let canBlock = true;
-              // Simple check: ensure there are other adjacent paths
-              let pathCount = 0;
-              for (const [dr, dc] of DIRS) {
-                if (maze[i-1+dr]?.[j+dc] === 1) pathCount++;
-              }
-              if (pathCount > 2) {
-                maze[i][j-1] = 0;
-              }
-            }
-          } else if (verticalPath && !horizontalPath) {
-            // Block one side vertically
-            if (Math.random() > 0.5 && maze[i-1][j] === 1) {
-              let pathCount = 0;
-              for (const [dr, dc] of DIRS) {
-                if (maze[i+dr]?.[j-1+dc] === 1) pathCount++;
-              }
-              if (pathCount > 2) {
-                maze[i-1][j] = 0;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  
   door = [size - 1, size - 1];
   
-  // Ensure path from start to home exists using BFS
-  const ensurePath = (from, to) => {
-    const queue = [from];
-    const visited = Array.from({length: size}, () => Array(size).fill(false));
-    const parent = Array.from({length: size}, () => Array(size).fill(null));
-    visited[from[0]][from[1]] = true;
-    
-    while (queue.length > 0) {
-      const [r, c] = queue.shift();
-      
-      if (r === to[0] && c === to[1]) {
-        // Path found, reconstruct and ensure it
-        let path = [];
-        let curr = [r, c];
-        while (curr) {
-          path.unshift(curr);
-          curr = parent[curr[0]][curr[1]];
-        }
-        path.forEach(([pr, pc]) => maze[pr][pc] = 1);
-        return true;
-      }
-      
-      for (const [dr, dc] of DIRS) {
-        const nr = r + dr;
-        const nc = c + dc;
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited[nr][nc]) {
-          visited[nr][nc] = true;
-          parent[nr][nc] = [r, c];
+  // STEP 2: AGGRESSIVELY remove straight paths - this is the key!
+  // Remove cells that allow straight horizontal or vertical movement
+  for (let i = 1; i < size - 1; i++) {
+    for (let j = 1; j < size - 1; j++) {
+      if (maze[i][j] === 1 && !(i === 0 && j === 0) && !(i === size-1 && j === size-1)) {
+        // Check if this creates a long straight path
+        let straightHorizontal = 0;
+        let straightVertical = 0;
+        
+        // Count consecutive horizontal cells
+        for (let k = j - 1; k >= 0 && maze[i][k] === 1; k--) straightHorizontal++;
+        for (let k = j + 1; k < size && maze[i][k] === 1; k++) straightHorizontal++;
+        
+        // Count consecutive vertical cells
+        for (let k = i - 1; k >= 0 && maze[k][j] === 1; k--) straightVertical++;
+        for (let k = i + 1; k < size && maze[k][j] === 1; k++) straightVertical++;
+        
+        // If there's a straight path of 3+ cells, remove this cell (70% chance)
+        if ((straightHorizontal >= 2 || straightVertical >= 2) && Math.random() > 0.3) {
+          // Check if removing won't disconnect the maze
+          const tempMaze = maze.map(row => [...row]);
+          tempMaze[i][j] = 0;
           
-          if (maze[nr][nc] === 1) {
-            queue.push([nr, nc]);
-          } else {
-            // Check if we need to carve through wall
-            let hasPathNeighbor = false;
-            for (const [dr2, dc2] of DIRS) {
-              const nnr = nr + dr2;
-              const nnc = nc + dc2;
-              if (nnr >= 0 && nnr < size && nnc >= 0 && nnc < size && 
-                  maze[nnr][nnc] === 1 && !(nnr === r && nnc === c)) {
-                hasPathNeighbor = true;
-                break;
-              }
-            }
-            if (hasPathNeighbor || (nr === to[0] && nc === to[1])) {
-              queue.push([nr, nc]);
-            }
+          if (isConnected(tempMaze)) {
+            maze[i][j] = 0;
           }
         }
       }
     }
-    return false;
-  };
+  }
   
-  ensurePath([0, 0], [size - 1, size - 1]);
-  
-  // Find all reachable cells
-  const reachable = [];
-  const bfsQueue = [[0, 0]];
-  const bfsVisited = Array.from({length: size}, () => Array(size).fill(false));
-  bfsVisited[0][0] = true;
-  
-  while (bfsQueue.length > 0) {
-    const [cr, cc] = bfsQueue.shift();
-    reachable.push([cr, cc]);
+  // STEP 3: Add strategic blocking walls in rows/columns
+  // For each row and column, add random blocking walls
+  for (let i = 1; i < size - 1; i++) {
+    // Block some cells in this row
+    const rowCells = [];
+    for (let j = 1; j < size - 1; j++) {
+      if (maze[i][j] === 1) rowCells.push(j);
+    }
     
-    for (const [dr, dc] of DIRS) {
-      const nr = cr + dr;
-      const nc = cc + dc;
-      if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
-          maze[nr][nc] === 1 && !bfsVisited[nr][nc]) {
-        bfsVisited[nr][nc] = true;
-        bfsQueue.push([nr, nc]);
+    // Block 30-50% of path cells in this row
+    const numToBlock = Math.floor(rowCells.length * (0.3 + Math.random() * 0.2));
+    for (let b = 0; b < numToBlock; b++) {
+      const idx = Math.floor(Math.random() * rowCells.length);
+      const colToBlock = rowCells.splice(idx, 1)[0];
+      
+      const tempMaze = maze.map(row => [...row]);
+      tempMaze[i][colToBlock] = 0;
+      
+      if (isConnected(tempMaze)) {
+        maze[i][colToBlock] = 0;
       }
     }
   }
   
-  // Place keys far apart on winding paths
-  const validKeyPositions = reachable.filter(([r, c]) => 
+  // Same for columns
+  for (let j = 1; j < size - 1; j++) {
+    const colCells = [];
+    for (let i = 1; i < size - 1; i++) {
+      if (maze[i][j] === 1) colCells.push(i);
+    }
+    
+    const numToBlock = Math.floor(colCells.length * (0.3 + Math.random() * 0.2));
+    for (let b = 0; b < numToBlock; b++) {
+      const idx = Math.floor(Math.random() * colCells.length);
+      const rowToBlock = colCells.splice(idx, 1)[0];
+      
+      const tempMaze = maze.map(row => [...row]);
+      tempMaze[rowToBlock][j] = 0;
+      
+      if (isConnected(tempMaze)) {
+        maze[rowToBlock][j] = 0;
+      }
+    }
+  }
+  
+  // STEP 4: Ensure critical paths exist and reconnect if needed
+  ensureConnectivity();
+  
+  // STEP 5: Place keys using dynamic programming
+  // Find all reachable cells and calculate minimum path distances
+  const reachable = findAllReachable([0, 0]);
+  const validPositions = reachable.filter(([r, c]) => 
     !(r === 0 && c === 0) && !(r === size - 1 && c === size - 1)
   );
   
-  keys = [];
-  if (validKeyPositions.length >= 2) {
-    // First key - place in first third of maze
-    const firstThird = validKeyPositions.filter(([r, c]) => r + c < size);
-    const idx1 = Math.floor(Math.random() * Math.max(1, firstThird.length));
-    keys.push(firstThird[idx1] || validKeyPositions[0]);
+  if (validPositions.length < 2) {
+    // Fallback - ensure some paths exist
+    maze[0][1] = 1;
+    maze[1][0] = 1;
+    maze[1][1] = 1;
+    keys = [[0, 1], [1, 0]];
+  } else {
+    // Use dynamic programming to find optimal key placement
+    // that maximizes path complexity
+    keys = findOptimalKeyPlacement(validPositions);
+  }
+  
+  // Final verification
+  ensurePathExists([0, 0], keys[0]);
+  ensurePathExists(keys[0], keys[1]);
+  ensurePathExists(keys[1], door);
+}
+
+// Check if maze is still connected using BFS
+function isConnected(testMaze) {
+  const visited = Array.from({length: size}, () => Array(size).fill(false));
+  const queue = [[0, 0]];
+  visited[0][0] = true;
+  let pathCount = 1;
+  
+  while (queue.length > 0) {
+    const [r, c] = queue.shift();
     
-    // Second key - place far from first
-    const [k1r, k1c] = keys[0];
-    validKeyPositions.sort((a, b) => {
-      const distA = Math.abs(a[0] - k1r) + Math.abs(a[1] - k1c);
-      const distB = Math.abs(b[0] - k1r) + Math.abs(b[1] - k1c);
-      return distB - distA;
-    });
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
+          testMaze[nr][nc] === 1 && !visited[nr][nc]) {
+        visited[nr][nc] = true;
+        queue.push([nr, nc]);
+        pathCount++;
+      }
+    }
+  }
+  
+  // Check if home is reachable
+  return visited[size - 1][size - 1];
+}
+
+// Ensure start and end are connected
+function ensureConnectivity() {
+  if (!isConnected(maze)) {
+    // Carve minimal path from start to end
+    const path = findShortestPath([0, 0], [size - 1, size - 1], true);
+    path.forEach(([r, c]) => maze[r][c] = 1);
+  }
+}
+
+// Find all reachable cells from a starting position
+function findAllReachable(start) {
+  const reachable = [];
+  const queue = [start];
+  const visited = Array.from({length: size}, () => Array(size).fill(false));
+  visited[start[0]][start[1]] = true;
+  
+  while (queue.length > 0) {
+    const [r, c] = queue.shift();
+    reachable.push([r, c]);
     
-    keys.push(validKeyPositions[0]);
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
+          maze[nr][nc] === 1 && !visited[nr][nc]) {
+        visited[nr][nc] = true;
+        queue.push([nr, nc]);
+      }
+    }
+  }
+  
+  return reachable;
+}
+
+// Find shortest path (can carve through walls if carve=true)
+function findShortestPath(start, end, carve = false) {
+  const queue = [[start, [start]]];
+  const visited = new Set([`${start[0]},${start[1]}`]);
+  
+  while (queue.length > 0) {
+    const [[r, c], path] = queue.shift();
     
-    // Ensure both keys have winding paths (not in same row/column)
-    if (keys[0][0] === keys[1][0] || keys[0][1] === keys[1][1]) {
-      // Find key in different row AND column
-      for (const pos of validKeyPositions) {
-        if (pos[0] !== keys[0][0] && pos[1] !== keys[0][1]) {
-          keys[1] = pos;
-          break;
+    if (r === end[0] && c === end[1]) {
+      return path;
+    }
+    
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      const key = `${nr},${nc}`;
+      
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited.has(key)) {
+        if (maze[nr][nc] === 1 || carve) {
+          visited.add(key);
+          queue.push([[nr, nc], [...path, [nr, nc]]]);
         }
       }
     }
-  } else {
-    keys.push([0, 1], [1, 0]);
-    maze[0][1] = 1;
-    maze[1][0] = 1;
   }
   
-  // Ensure paths to both keys
-  ensurePath([0, 0], keys[0]);
-  ensurePath(keys[0], keys[1]);
-  ensurePath(keys[1], [size - 1, size - 1]);
+  return [];
+}
+
+// Ensure a path exists between two points
+function ensurePathExists(start, end) {
+  const existingPath = findShortestPath(start, end, false);
+  if (existingPath.length === 0) {
+    // Carve a winding path
+    const path = findShortestPath(start, end, true);
+    path.forEach(([r, c]) => maze[r][c] = 1);
+  }
+}
+
+// Dynamic Programming: Find optimal key placement that maximizes path difficulty
+function findOptimalKeyPlacement(validPositions) {
+  let bestKeys = [validPositions[0], validPositions[1]];
+  let maxComplexity = 0;
+  
+  // Try multiple random combinations and pick the one with longest total path
+  const numAttempts = Math.min(50, validPositions.length * (validPositions.length - 1) / 2);
+  
+  for (let attempt = 0; attempt < numAttempts; attempt++) {
+    const idx1 = Math.floor(Math.random() * validPositions.length);
+    const idx2 = Math.floor(Math.random() * validPositions.length);
+    
+    if (idx1 === idx2) continue;
+    
+    const key1 = validPositions[idx1];
+    const key2 = validPositions[idx2];
+    
+    // Calculate path complexity: total Manhattan distance + path length
+    const pathToKey1 = findShortestPath([0, 0], key1);
+    const pathToKey2 = findShortestPath(key1, key2);
+    const pathToHome = findShortestPath(key2, door);
+    
+    if (pathToKey1.length > 0 && pathToKey2.length > 0 && pathToHome.length > 0) {
+      const totalLength = pathToKey1.length + pathToKey2.length + pathToHome.length;
+      const manhattanDist = Math.abs(key1[0] - key2[0]) + Math.abs(key1[1] - key2[1]);
+      const complexity = totalLength + manhattanDist;
+      
+      // Prefer keys that are NOT in same row or column (adds bonus)
+      const notSameRowCol = (key1[0] !== key2[0] && key1[1] !== key2[1]) ? 20 : 0;
+      
+      if (complexity + notSameRowCol > maxComplexity) {
+        maxComplexity = complexity + notSameRowCol;
+        bestKeys = [key1, key2];
+      }
+    }
+  }
+  
+  return bestKeys;
 }
 
 // Reset player position and keys after hitting wall

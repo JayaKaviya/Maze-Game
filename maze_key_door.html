@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invisible Maze Challenge</title>
+<style>
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  color: white;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h2 {
+  font-size: 28px;
+  margin-bottom: 10px;
+  color: #fbbf24;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.instructions {
+  background: rgba(30, 41, 59, 0.8);
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border: 2px solid #334155;
+}
+
+.instructions p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.status {
+  background: rgba(51, 65, 85, 0.9);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.buttons {
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 12px 24px;
+  margin: 5px;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 2px solid #475569;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+table {
+  margin: 20px auto;
+  border-collapse: collapse;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+td {
+  width: 50px;
+  height: 50px;
+  border: 1px solid #475569;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 28px;
+  user-select: none;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.player::after { 
+  content: "👤"; 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.key::after { 
+  content: "🔑"; 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.door::after { 
+  content: "🚪"; 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.home::after { 
+  content: "🏠"; 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.player-home::before { 
+  content: "🏠"; 
+  position: absolute; 
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.player-home::after { 
+  content: "👤"; 
+  position: absolute; 
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.hit { 
+  background: #dc2626 !important;
+  animation: shake 0.3s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.win-message {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+}
+
+.lose-message {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+}
+
+.timer-warning {
+  color: #fbbf24 !important;
+  animation: blink 1s infinite;
+}
+
+.timer-critical {
+  color: #dc2626 !important;
+  animation: blink 0.5s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.4; }
+}
+
+.solution-path {
+  background: rgba(34, 197, 94, 0.6) !important;
+  border: 2px solid #22c55e !important;
+}
+
+.solution-key {
+  background: rgba(251, 191, 36, 0.6) !important;
+  border: 2px solid #fbbf24 !important;
+}
+
+.solution-text {
+  background: rgba(59, 130, 246, 0.9);
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>🔐 Invisible Maze Challenge</h2>
+  
+  <div class="instructions">
+    <p><strong>🎯 Mission:</strong> Collect 2 keys (🔑) and reach home (🏠)</p>
+    <p><strong>⚠️ Rules:</strong> The maze is invisible! Hit a wall = restart from beginning</p>
+    <p><strong>🎮 Controls:</strong> Use Arrow Keys (↑ ↓ ← →) to navigate</p>
+  </div>
+
+  <div class="status" id="status">
+    ⏱️ Time: <span id="timer">4:00</span> | Keys: <span id="keyCount">0</span> / 2 | Attempts: <span id="attempts">0</span>
+  </div>
+
+  <div class="buttons">
+    <button onclick="startGame(5)">Easy (5×5)</button>
+    <button onclick="startGame(6)">Medium (6×6)</button>
+    <button onclick="startGame(7)">Hard (7×7)</button>
+    <button id="solutionBtn" onclick="showSolution()" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); display: none;">Show Solution</button>
+  </div>
+
+  <div id="maze"></div>
+  <div id="winMessage"></div>
+</div>
+
+<script>
+let size, player, start;
+let keysCollected = 0;
+let hitCell = null;
+let activeKeys = [];
+let gameWon = false;
+let maze = []; // 0=wall, 1=path
+let door, keys = [];
+let attempts = 0;
+let timeLeft = 240; // 4 minutes in seconds
+let timerInterval = null;
+let gameActive = false;
+let showingSolution = false;
+let solutionPath = [];
+
+const DIRS = [[-1,0], [1,0], [0,-1], [0,1]];
+
+// Start new game
+function startGame(n) {
+  size = n;
+  attempts = 0;
+  timeLeft = 240; // Reset to 4 minutes
+  gameActive = true;
+  showingSolution = false;
+  solutionPath = [];
+  
+  // Hide solution button initially
+  document.getElementById("solutionBtn").style.display = "none";
+  
+  // Clear existing timer
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+  
+  generateHardMaze();
+  resetGame();
+  render();
+  updateStatus();
+  startTimer();
+}
+
+// Generate a TRULY HARD maze with winding paths and blocked rows/columns
+function generateHardMaze() {
+  // Initialize all cells as walls
+  maze = Array.from({length: size}, () => Array(size).fill(0));
+  
+  // Create maze using recursive backtracking with tight passages
+  const stack = [];
+  const visited = Array.from({length: size}, () => Array(size).fill(false));
+
+  // Start position
+  let r = 0, c = 0;
+  maze[r][c] = 1;
+  visited[r][c] = true;
+  stack.push([r, c]);
+
+  while (stack.length > 0) {
+    [r, c] = stack[stack.length - 1];
+    
+    // Find unvisited neighbors 2 cells away
+    const neighbors = [];
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr * 2;
+      const nc = c + dc * 2;
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited[nr][nc]) {
+        neighbors.push([nr, nc, dr, dc]);
+      }
+    }
+
+    if (neighbors.length > 0) {
+      const [nr, nc, dr, dc] = neighbors[Math.floor(Math.random() * neighbors.length)];
+      
+      // Carve path
+      maze[r + dr][c + dc] = 1;
+      maze[nr][nc] = 1;
+      visited[nr][nc] = true;
+      stack.push([nr, nc]);
+    } else {
+      stack.pop();
+    }
+  }
+
+  // Ensure home is reachable
+  maze[size - 1][size - 1] = 1;
+  
+  // NOW THE KEY PART: Block many straight paths to force winding routes
+  // Add strategic walls to break up straight lines in rows and columns
+  for (let i = 1; i < size - 1; i++) {
+    for (let j = 1; j < size - 1; j++) {
+      if (maze[i][j] === 1) {
+        // 50% chance to check if we should add blocking walls
+        if (Math.random() > 0.5) {
+          // Count horizontal and vertical paths
+          let horizontalPath = maze[i][j-1] === 1 && maze[i][j+1] === 1;
+          let verticalPath = maze[i-1][j] === 1 && maze[i+1][j] === 1;
+          
+          // If there's a straight path, block it (but ensure alternate route exists)
+          if (horizontalPath && !verticalPath) {
+            // Block one side horizontally
+            if (Math.random() > 0.5 && maze[i][j-1] === 1) {
+              // Check if blocking won't isolate areas
+              let canBlock = true;
+              // Simple check: ensure there are other adjacent paths
+              let pathCount = 0;
+              for (const [dr, dc] of DIRS) {
+                if (maze[i-1+dr]?.[j+dc] === 1) pathCount++;
+              }
+              if (pathCount > 2) {
+                maze[i][j-1] = 0;
+              }
+            }
+          } else if (verticalPath && !horizontalPath) {
+            // Block one side vertically
+            if (Math.random() > 0.5 && maze[i-1][j] === 1) {
+              let pathCount = 0;
+              for (const [dr, dc] of DIRS) {
+                if (maze[i+dr]?.[j-1+dc] === 1) pathCount++;
+              }
+              if (pathCount > 2) {
+                maze[i-1][j] = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  door = [size - 1, size - 1];
+  
+  // Ensure path from start to home exists using BFS
+  const ensurePath = (from, to) => {
+    const queue = [from];
+    const visited = Array.from({length: size}, () => Array(size).fill(false));
+    const parent = Array.from({length: size}, () => Array(size).fill(null));
+    visited[from[0]][from[1]] = true;
+    
+    while (queue.length > 0) {
+      const [r, c] = queue.shift();
+      
+      if (r === to[0] && c === to[1]) {
+        // Path found, reconstruct and ensure it
+        let path = [];
+        let curr = [r, c];
+        while (curr) {
+          path.unshift(curr);
+          curr = parent[curr[0]][curr[1]];
+        }
+        path.forEach(([pr, pc]) => maze[pr][pc] = 1);
+        return true;
+      }
+      
+      for (const [dr, dc] of DIRS) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited[nr][nc]) {
+          visited[nr][nc] = true;
+          parent[nr][nc] = [r, c];
+          
+          if (maze[nr][nc] === 1) {
+            queue.push([nr, nc]);
+          } else {
+            // Check if we need to carve through wall
+            let hasPathNeighbor = false;
+            for (const [dr2, dc2] of DIRS) {
+              const nnr = nr + dr2;
+              const nnc = nc + dc2;
+              if (nnr >= 0 && nnr < size && nnc >= 0 && nnc < size && 
+                  maze[nnr][nnc] === 1 && !(nnr === r && nnc === c)) {
+                hasPathNeighbor = true;
+                break;
+              }
+            }
+            if (hasPathNeighbor || (nr === to[0] && nc === to[1])) {
+              queue.push([nr, nc]);
+            }
+          }
+        }
+      }
+    }
+    return false;
+  };
+  
+  ensurePath([0, 0], [size - 1, size - 1]);
+  
+  // Find all reachable cells
+  const reachable = [];
+  const bfsQueue = [[0, 0]];
+  const bfsVisited = Array.from({length: size}, () => Array(size).fill(false));
+  bfsVisited[0][0] = true;
+  
+  while (bfsQueue.length > 0) {
+    const [cr, cc] = bfsQueue.shift();
+    reachable.push([cr, cc]);
+    
+    for (const [dr, dc] of DIRS) {
+      const nr = cr + dr;
+      const nc = cc + dc;
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
+          maze[nr][nc] === 1 && !bfsVisited[nr][nc]) {
+        bfsVisited[nr][nc] = true;
+        bfsQueue.push([nr, nc]);
+      }
+    }
+  }
+  
+  // Place keys far apart on winding paths
+  const validKeyPositions = reachable.filter(([r, c]) => 
+    !(r === 0 && c === 0) && !(r === size - 1 && c === size - 1)
+  );
+  
+  keys = [];
+  if (validKeyPositions.length >= 2) {
+    // First key - place in first third of maze
+    const firstThird = validKeyPositions.filter(([r, c]) => r + c < size);
+    const idx1 = Math.floor(Math.random() * Math.max(1, firstThird.length));
+    keys.push(firstThird[idx1] || validKeyPositions[0]);
+    
+    // Second key - place far from first
+    const [k1r, k1c] = keys[0];
+    validKeyPositions.sort((a, b) => {
+      const distA = Math.abs(a[0] - k1r) + Math.abs(a[1] - k1c);
+      const distB = Math.abs(b[0] - k1r) + Math.abs(b[1] - k1c);
+      return distB - distA;
+    });
+    
+    keys.push(validKeyPositions[0]);
+    
+    // Ensure both keys have winding paths (not in same row/column)
+    if (keys[0][0] === keys[1][0] || keys[0][1] === keys[1][1]) {
+      // Find key in different row AND column
+      for (const pos of validKeyPositions) {
+        if (pos[0] !== keys[0][0] && pos[1] !== keys[0][1]) {
+          keys[1] = pos;
+          break;
+        }
+      }
+    }
+  } else {
+    keys.push([0, 1], [1, 0]);
+    maze[0][1] = 1;
+    maze[1][0] = 1;
+  }
+  
+  // Ensure paths to both keys
+  ensurePath([0, 0], keys[0]);
+  ensurePath(keys[0], keys[1]);
+  ensurePath(keys[1], [size - 1, size - 1]);
+}
+
+// Reset player position and keys after hitting wall
+function resetGame() {
+  player = [0, 0];
+  activeKeys = keys.map(k => [...k]);
+  keysCollected = 0;
+  hitCell = null;
+  gameWon = false;
+  document.getElementById("winMessage").innerHTML = "";
+}
+
+// Handle keyboard input
+document.addEventListener("keydown", e => {
+  if (gameWon || !gameActive) return;
+  
+  const map = {
+    ArrowUp: [-1, 0],
+    ArrowDown: [1, 0],
+    ArrowLeft: [0, -1],
+    ArrowRight: [0, 1]
+  };
+  
+  if (map[e.key]) {
+    e.preventDefault();
+    move(...map[e.key]);
+  }
+});
+
+// Move player
+function move(dr, dc) {
+  const [r, c] = player;
+  const nr = r + dr;
+  const nc = c + dc;
+  
+  // Check if out of bounds or hit wall
+  if (nr < 0 || nc < 0 || nr >= size || nc >= size || maze[nr][nc] === 0) {
+    hitCell = [nr >= 0 && nr < size && nc >= 0 && nc < size ? nr : r, 
+               nr >= 0 && nr < size && nc >= 0 && nc < size ? nc : c];
+    attempts++;
+    render();
+    updateStatus();
+    
+    // Reset after 400ms
+    setTimeout(() => {
+      hitCell = null;
+      resetGame();
+      render();
+      updateStatus();
+    }, 400);
+    return;
+  }
+  
+  // Valid move
+  player = [nr, nc];
+  checkCollision();
+  render();
+  updateStatus();
+}
+
+// Check for key collection and home arrival
+function checkCollision() {
+  // Check if player collected a key
+  activeKeys.forEach((k, i) => {
+    if (k && player[0] === k[0] && player[1] === k[1]) {
+      activeKeys[i] = null;
+      keysCollected++;
+    }
+  });
+
+  // Check if player reached door/home
+  if (player[0] === door[0] && player[1] === door[1]) {
+    if (keysCollected === 2) {
+      gameWon = true;
+      gameActive = false;
+      clearInterval(timerInterval);
+      
+      const minutes = Math.floor((240 - timeLeft) / 60);
+      const seconds = (240 - timeLeft) % 60;
+      const timeUsed = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      
+      document.getElementById("winMessage").innerHTML = 
+        `<div class="win-message">🎉 Victory! You completed the ${size}×${size} maze in ${timeUsed} (${attempts} attempts)!</div>`;
+      
+      // Show solution button on win
+      document.getElementById("solutionBtn").style.display = "inline-block";
+      document.getElementById("solutionBtn").textContent = "View Solution Path";
+      
+      // Auto-restart after 4 seconds
+      setTimeout(() => {
+        if (!showingSolution) {
+          startGame(size);
+        }
+      }, 4000);
+    } else {
+      // Reached home without all keys - restart
+      attempts++;
+      setTimeout(() => {
+        resetGame();
+        render();
+        updateStatus();
+      }, 300);
+    }
+  }
+}
+
+// Render the maze
+function render() {
+  let html = "<table>";
+  for (let r = 0; r < size; r++) {
+    html += "<tr>";
+    for (let c = 0; c < size; c++) {
+      let cls = [];
+      
+      // Show solution path if enabled
+      if (showingSolution) {
+        if (solutionPath.some(([pr, pc]) => pr === r && pc === c)) {
+          cls.push("solution-path");
+        }
+        // Highlight key positions in solution
+        if (keys.some(k => k && k[0] === r && k[1] === c)) {
+          cls.push("solution-key");
+        }
+      }
+      
+      // Show player
+      if (player[0] === r && player[1] === c) {
+        if (gameWon && r === door[0] && c === door[1]) {
+          cls.push("player-home");
+        } else {
+          cls.push("player");
+        }
+      }
+      
+      // Show active keys (not collected yet)
+      if (!showingSolution) {
+        activeKeys.forEach(k => {
+          if (k && k[0] === r && k[1] === c) {
+            cls.push("key");
+          }
+        });
+      }
+      
+      // Show door
+      if (r === door[0] && c === door[1] && !cls.includes("player-home")) {
+        if (keysCollected === 2 || showingSolution) {
+          cls.push("home");
+        } else {
+          cls.push("door");
+        }
+      }
+      
+      // Show hit cell
+      if (hitCell && hitCell[0] === r && hitCell[1] === c) {
+        cls = ["hit"];
+      }
+      
+      html += `<td class="${cls.join(" ")}"></td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</table>";
+  document.getElementById("maze").innerHTML = html;
+}
+
+// Update status display
+function updateStatus() {
+  document.getElementById("keyCount").textContent = keysCollected;
+  document.getElementById("attempts").textContent = attempts;
+  updateTimerDisplay();
+}
+
+// Timer functions
+function startTimer() {
+  timerInterval = setInterval(() => {
+    if (!gameActive) {
+      clearInterval(timerInterval);
+      return;
+    }
+    
+    timeLeft--;
+    updateTimerDisplay();
+    
+    if (timeLeft <= 0) {
+      gameOver();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const timerDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const timerElement = document.getElementById("timer");
+  
+  timerElement.textContent = timerDisplay;
+  
+  // Remove all timer classes
+  timerElement.classList.remove('timer-warning', 'timer-critical');
+  
+  // Add warning/critical classes based on time
+  if (timeLeft <= 30) {
+    timerElement.classList.add('timer-critical');
+  } else if (timeLeft <= 60) {
+    timerElement.classList.add('timer-warning');
+  }
+  
+  // Show solution button when time runs out
+  if (timeLeft <= 0) {
+    document.getElementById("solutionBtn").style.display = "inline-block";
+  }
+}
+
+function gameOver() {
+  gameActive = false;
+  gameWon = false;
+  clearInterval(timerInterval);
+  
+  document.getElementById("winMessage").innerHTML = 
+    `<div class="lose-message">⏰ TIME'S UP! You're out! Try again?</div>`;
+  
+  // Show solution button
+  document.getElementById("solutionBtn").style.display = "inline-block";
+  
+  // Auto-restart after 3 seconds
+  setTimeout(() => {
+    if (!showingSolution) {
+      document.getElementById("winMessage").innerHTML = "";
+      startGame(size);
+    }
+  }, 3000);
+}
+
+// Show solution path
+function showSolution() {
+  showingSolution = true;
+  solutionPath = [];
+  
+  // Find path from start to key1 to key2 to home using BFS
+  const findPath = (start, end) => {
+    const queue = [[start, [start]]];
+    const visited = new Set([`${start[0]},${start[1]}`]);
+    
+    while (queue.length > 0) {
+      const [[r, c], path] = queue.shift();
+      
+      if (r === end[0] && c === end[1]) {
+        return path;
+      }
+      
+      for (const [dr, dc] of DIRS) {
+        const nr = r + dr;
+        const nc = c + dc;
+        const key = `${nr},${nc}`;
+        
+        if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
+            maze[nr][nc] === 1 && !visited.has(key)) {
+          visited.add(key);
+          queue.push([[nr, nc], [...path, [nr, nc]]]);
+        }
+      }
+    }
+    return [];
+  };
+  
+  // Path: Start -> Key1 -> Key2 -> Home
+  const pathToKey1 = findPath([0, 0], keys[0]);
+  const pathToKey2 = findPath(keys[0], keys[1]);
+  const pathToHome = findPath(keys[1], door);
+  
+  // Combine all paths (remove duplicates at junctions)
+  solutionPath = [
+    ...pathToKey1,
+    ...pathToKey2.slice(1), // Skip first element (same as last of pathToKey1)
+    ...pathToHome.slice(1)  // Skip first element (same as last of pathToKey2)
+  ];
+  
+  render();
+  
+  const pathLength = solutionPath.length;
+  document.getElementById("winMessage").innerHTML = 
+    `<div class="solution-text">
+      ✨ <strong>SOLUTION REVEALED</strong> ✨<br>
+      🟢 Green path = Correct route (${pathLength} steps)<br>
+      🟡 Yellow highlight = Key locations<br>
+      Follow: Start → 🔑 Key 1 → 🔑 Key 2 → 🏠 Home
+    </div>`;
+}
+
+// Start with medium difficulty
+startGame(6);
+</script>
+</body>
+</html>

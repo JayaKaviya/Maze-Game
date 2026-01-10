@@ -231,7 +231,7 @@ td {
     <button onclick="startGame(5)">Easy (5×5)</button>
     <button onclick="startGame(6)">Medium (6×6)</button>
     <button onclick="startGame(7)">Hard (7×7)</button>
-    <button id="solutionBtn" onclick="showSolution()" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); display: none;">Show Solution</button>
+    <button id="solutionBtn" onclick="toggleSolution()" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); display: none;">Show Solution</button>
   </div>
 
   <div id="maze"></div>
@@ -244,10 +244,10 @@ let keysCollected = 0;
 let hitCell = null;
 let activeKeys = [];
 let gameWon = false;
-let maze = []; // 0=wall, 1=path
+let maze = [];
 let door, keys = [];
 let attempts = 0;
-let timeLeft = 240; // 4 minutes in seconds
+let timeLeft = 240;
 let timerInterval = null;
 let gameActive = false;
 let showingSolution = false;
@@ -257,20 +257,37 @@ const DIRS = [[-1,0], [1,0], [0,-1], [0,1]];
 
 // Start new game
 function startGame(n) {
+  if (showingSolution) {
+    showingSolution = false;
+    solutionPath = [];
+    timeLeft = 240;
+    gameActive = true;
+    attempts = 0;
+    
+    document.getElementById("solutionBtn").style.display = "none";
+    document.getElementById("solutionBtn").textContent = "Show Solution";
+    document.getElementById("winMessage").innerHTML = "";
+    
+    if (timerInterval) clearInterval(timerInterval);
+    
+    resetGame();
+    render();
+    updateStatus();
+    startTimer();
+    return;
+  }
+  
   size = n;
   attempts = 0;
-  timeLeft = 240; // Reset to 4 minutes
+  timeLeft = 240;
   gameActive = true;
   showingSolution = false;
   solutionPath = [];
   
-  // Hide solution button initially
   document.getElementById("solutionBtn").style.display = "none";
+  document.getElementById("winMessage").innerHTML = "";
   
-  // Clear existing timer
-  if (timerInterval) {
-    clearInterval(timerInterval);
-  }
+  if (timerInterval) clearInterval(timerInterval);
   
   generateHardMaze();
   resetGame();
@@ -279,12 +296,10 @@ function startGame(n) {
   startTimer();
 }
 
-// Generate EXTREMELY HARD maze using advanced algorithms
+// Generate hard maze
 function generateHardMaze() {
-  // Initialize all cells as walls
   maze = Array.from({length: size}, () => Array(size).fill(0));
   
-  // STEP 1: Generate base maze using recursive backtracking
   const stack = [];
   const visited = Array.from({length: size}, () => Array(size).fill(false));
 
@@ -319,146 +334,73 @@ function generateHardMaze() {
   maze[size - 1][size - 1] = 1;
   door = [size - 1, size - 1];
   
-  // STEP 2: AGGRESSIVELY remove straight paths - this is the key!
-  // Remove cells that allow straight horizontal or vertical movement
+  // Block straight paths
   for (let i = 1; i < size - 1; i++) {
     for (let j = 1; j < size - 1; j++) {
       if (maze[i][j] === 1 && !(i === 0 && j === 0) && !(i === size-1 && j === size-1)) {
-        // Check if this creates a long straight path
-        let straightHorizontal = 0;
-        let straightVertical = 0;
+        let straightH = 0, straightV = 0;
         
-        // Count consecutive horizontal cells
-        for (let k = j - 1; k >= 0 && maze[i][k] === 1; k--) straightHorizontal++;
-        for (let k = j + 1; k < size && maze[i][k] === 1; k++) straightHorizontal++;
+        for (let k = j - 1; k >= 0 && maze[i][k] === 1; k--) straightH++;
+        for (let k = j + 1; k < size && maze[i][k] === 1; k++) straightH++;
+        for (let k = i - 1; k >= 0 && maze[k][j] === 1; k--) straightV++;
+        for (let k = i + 1; k < size && maze[k][j] === 1; k++) straightV++;
         
-        // Count consecutive vertical cells
-        for (let k = i - 1; k >= 0 && maze[k][j] === 1; k--) straightVertical++;
-        for (let k = i + 1; k < size && maze[k][j] === 1; k++) straightVertical++;
-        
-        // If there's a straight path of 3+ cells, remove this cell (70% chance)
-        if ((straightHorizontal >= 2 || straightVertical >= 2) && Math.random() > 0.3) {
-          // Check if removing won't disconnect the maze
+        if ((straightH >= 2 || straightV >= 2) && Math.random() > 0.3) {
           const tempMaze = maze.map(row => [...row]);
           tempMaze[i][j] = 0;
-          
-          if (isConnected(tempMaze)) {
-            maze[i][j] = 0;
-          }
+          if (isConnected(tempMaze)) maze[i][j] = 0;
         }
       }
     }
   }
   
-  // STEP 3: Add strategic blocking walls in rows/columns
-  // For each row and column, add random blocking walls
-  for (let i = 1; i < size - 1; i++) {
-    // Block some cells in this row
-    const rowCells = [];
-    for (let j = 1; j < size - 1; j++) {
-      if (maze[i][j] === 1) rowCells.push(j);
-    }
-    
-    // Block 30-50% of path cells in this row
-    const numToBlock = Math.floor(rowCells.length * (0.3 + Math.random() * 0.2));
-    for (let b = 0; b < numToBlock; b++) {
-      const idx = Math.floor(Math.random() * rowCells.length);
-      const colToBlock = rowCells.splice(idx, 1)[0];
-      
-      const tempMaze = maze.map(row => [...row]);
-      tempMaze[i][colToBlock] = 0;
-      
-      if (isConnected(tempMaze)) {
-        maze[i][colToBlock] = 0;
-      }
-    }
-  }
-  
-  // Same for columns
-  for (let j = 1; j < size - 1; j++) {
-    const colCells = [];
-    for (let i = 1; i < size - 1; i++) {
-      if (maze[i][j] === 1) colCells.push(i);
-    }
-    
-    const numToBlock = Math.floor(colCells.length * (0.3 + Math.random() * 0.2));
-    for (let b = 0; b < numToBlock; b++) {
-      const idx = Math.floor(Math.random() * colCells.length);
-      const rowToBlock = colCells.splice(idx, 1)[0];
-      
-      const tempMaze = maze.map(row => [...row]);
-      tempMaze[rowToBlock][j] = 0;
-      
-      if (isConnected(tempMaze)) {
-        maze[rowToBlock][j] = 0;
-      }
-    }
-  }
-  
-  // STEP 4: Ensure critical paths exist and reconnect if needed
   ensureConnectivity();
   
-  // STEP 5: Place keys using dynamic programming
-  // Find all reachable cells and calculate minimum path distances
   const reachable = findAllReachable([0, 0]);
   const validPositions = reachable.filter(([r, c]) => 
     !(r === 0 && c === 0) && !(r === size - 1 && c === size - 1)
   );
   
   if (validPositions.length < 2) {
-    // Fallback - ensure some paths exist
     maze[0][1] = 1;
     maze[1][0] = 1;
     maze[1][1] = 1;
     keys = [[0, 1], [1, 0]];
   } else {
-    // Use dynamic programming to find optimal key placement
-    // that maximizes path complexity
     keys = findOptimalKeyPlacement(validPositions);
   }
   
-  // Final verification
   ensurePathExists([0, 0], keys[0]);
   ensurePathExists(keys[0], keys[1]);
   ensurePathExists(keys[1], door);
 }
 
-// Check if maze is still connected using BFS
 function isConnected(testMaze) {
   const visited = Array.from({length: size}, () => Array(size).fill(false));
   const queue = [[0, 0]];
   visited[0][0] = true;
-  let pathCount = 1;
   
   while (queue.length > 0) {
     const [r, c] = queue.shift();
-    
     for (const [dr, dc] of DIRS) {
-      const nr = r + dr;
-      const nc = c + dc;
+      const nr = r + dr, nc = c + dc;
       if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
           testMaze[nr][nc] === 1 && !visited[nr][nc]) {
         visited[nr][nc] = true;
         queue.push([nr, nc]);
-        pathCount++;
       }
     }
   }
-  
-  // Check if home is reachable
   return visited[size - 1][size - 1];
 }
 
-// Ensure start and end are connected
 function ensureConnectivity() {
   if (!isConnected(maze)) {
-    // Carve minimal path from start to end
     const path = findShortestPath([0, 0], [size - 1, size - 1], true);
     path.forEach(([r, c]) => maze[r][c] = 1);
   }
 }
 
-// Find all reachable cells from a starting position
 function findAllReachable(start) {
   const reachable = [];
   const queue = [start];
@@ -468,10 +410,8 @@ function findAllReachable(start) {
   while (queue.length > 0) {
     const [r, c] = queue.shift();
     reachable.push([r, c]);
-    
     for (const [dr, dc] of DIRS) {
-      const nr = r + dr;
-      const nc = c + dc;
+      const nr = r + dr, nc = c + dc;
       if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
           maze[nr][nc] === 1 && !visited[nr][nc]) {
         visited[nr][nc] = true;
@@ -479,27 +419,20 @@ function findAllReachable(start) {
       }
     }
   }
-  
   return reachable;
 }
 
-// Find shortest path (can carve through walls if carve=true)
 function findShortestPath(start, end, carve = false) {
   const queue = [[start, [start]]];
   const visited = new Set([`${start[0]},${start[1]}`]);
   
   while (queue.length > 0) {
     const [[r, c], path] = queue.shift();
-    
-    if (r === end[0] && c === end[1]) {
-      return path;
-    }
+    if (r === end[0] && c === end[1]) return path;
     
     for (const [dr, dc] of DIRS) {
-      const nr = r + dr;
-      const nc = c + dc;
+      const nr = r + dr, nc = c + dc;
       const key = `${nr},${nc}`;
-      
       if (nr >= 0 && nr < size && nc >= 0 && nc < size && !visited.has(key)) {
         if (maze[nr][nc] === 1 || carve) {
           visited.add(key);
@@ -508,38 +441,31 @@ function findShortestPath(start, end, carve = false) {
       }
     }
   }
-  
   return [];
 }
 
-// Ensure a path exists between two points
 function ensurePathExists(start, end) {
   const existingPath = findShortestPath(start, end, false);
   if (existingPath.length === 0) {
-    // Carve a winding path
     const path = findShortestPath(start, end, true);
     path.forEach(([r, c]) => maze[r][c] = 1);
   }
 }
 
-// Dynamic Programming: Find optimal key placement that maximizes path difficulty
 function findOptimalKeyPlacement(validPositions) {
-  let bestKeys = [validPositions[0], validPositions[1]];
+  let bestKeys = [validPositions[0], validPositions[Math.min(1, validPositions.length - 1)]];
   let maxComplexity = 0;
   
-  // Try multiple random combinations and pick the one with longest total path
   const numAttempts = Math.min(50, validPositions.length * (validPositions.length - 1) / 2);
   
   for (let attempt = 0; attempt < numAttempts; attempt++) {
     const idx1 = Math.floor(Math.random() * validPositions.length);
     const idx2 = Math.floor(Math.random() * validPositions.length);
-    
     if (idx1 === idx2) continue;
     
     const key1 = validPositions[idx1];
     const key2 = validPositions[idx2];
     
-    // Calculate path complexity: total Manhattan distance + path length
     const pathToKey1 = findShortestPath([0, 0], key1);
     const pathToKey2 = findShortestPath(key1, key2);
     const pathToHome = findShortestPath(key2, door);
@@ -548,8 +474,6 @@ function findOptimalKeyPlacement(validPositions) {
       const totalLength = pathToKey1.length + pathToKey2.length + pathToHome.length;
       const manhattanDist = Math.abs(key1[0] - key2[0]) + Math.abs(key1[1] - key2[1]);
       const complexity = totalLength + manhattanDist;
-      
-      // Prefer keys that are NOT in same row or column (adds bonus)
       const notSameRowCol = (key1[0] !== key2[0] && key1[1] !== key2[1]) ? 20 : 0;
       
       if (complexity + notSameRowCol > maxComplexity) {
@@ -558,11 +482,9 @@ function findOptimalKeyPlacement(validPositions) {
       }
     }
   }
-  
   return bestKeys;
 }
 
-// Reset player position and keys after hitting wall
 function resetGame() {
   player = [0, 0];
   activeKeys = keys.map(k => [...k]);
@@ -572,38 +494,25 @@ function resetGame() {
   document.getElementById("winMessage").innerHTML = "";
 }
 
-// Handle keyboard input
 document.addEventListener("keydown", e => {
   if (gameWon || !gameActive) return;
-  
-  const map = {
-    ArrowUp: [-1, 0],
-    ArrowDown: [1, 0],
-    ArrowLeft: [0, -1],
-    ArrowRight: [0, 1]
-  };
-  
+  const map = {ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]};
   if (map[e.key]) {
     e.preventDefault();
     move(...map[e.key]);
   }
 });
 
-// Move player
 function move(dr, dc) {
   const [r, c] = player;
-  const nr = r + dr;
-  const nc = c + dc;
+  const nr = r + dr, nc = c + dc;
   
-  // Check if out of bounds or hit wall
   if (nr < 0 || nc < 0 || nr >= size || nc >= size || maze[nr][nc] === 0) {
     hitCell = [nr >= 0 && nr < size && nc >= 0 && nc < size ? nr : r, 
                nr >= 0 && nr < size && nc >= 0 && nc < size ? nc : c];
     attempts++;
     render();
     updateStatus();
-    
-    // Reset after 400ms
     setTimeout(() => {
       hitCell = null;
       resetGame();
@@ -613,16 +522,13 @@ function move(dr, dc) {
     return;
   }
   
-  // Valid move
   player = [nr, nc];
   checkCollision();
   render();
   updateStatus();
 }
 
-// Check for key collection and home arrival
 function checkCollision() {
-  // Check if player collected a key
   activeKeys.forEach((k, i) => {
     if (k && player[0] === k[0] && player[1] === k[1]) {
       activeKeys[i] = null;
@@ -630,7 +536,6 @@ function checkCollision() {
     }
   });
 
-  // Check if player reached door/home
   if (player[0] === door[0] && player[1] === door[1]) {
     if (keysCollected === 2) {
       gameWon = true;
@@ -644,18 +549,13 @@ function checkCollision() {
       document.getElementById("winMessage").innerHTML = 
         `<div class="win-message">🎉 Victory! You completed the ${size}×${size} maze in ${timeUsed} (${attempts} attempts)!</div>`;
       
-      // Show solution button on win
       document.getElementById("solutionBtn").style.display = "inline-block";
       document.getElementById("solutionBtn").textContent = "View Solution Path";
       
-      // Auto-restart after 4 seconds
       setTimeout(() => {
-        if (!showingSolution) {
-          startGame(size);
-        }
+        if (!showingSolution) startGame(size);
       }, 4000);
     } else {
-      // Reached home without all keys - restart
       attempts++;
       setTimeout(() => {
         resetGame();
@@ -666,7 +566,6 @@ function checkCollision() {
   }
 }
 
-// Render the maze
 function render() {
   let html = "<table>";
   for (let r = 0; r < size; r++) {
@@ -674,48 +573,28 @@ function render() {
     for (let c = 0; c < size; c++) {
       let cls = [];
       
-      // Show solution path if enabled
       if (showingSolution) {
-        if (solutionPath.some(([pr, pc]) => pr === r && pc === c)) {
-          cls.push("solution-path");
-        }
-        // Highlight key positions in solution
-        if (keys.some(k => k && k[0] === r && k[1] === c)) {
-          cls.push("solution-key");
-        }
+        if (solutionPath.some(([pr, pc]) => pr === r && pc === c)) cls.push("solution-path");
+        if (keys.some(k => k && k[0] === r && k[1] === c)) cls.push("solution-key");
       }
       
-      // Show player
       if (player[0] === r && player[1] === c) {
-        if (gameWon && r === door[0] && c === door[1]) {
-          cls.push("player-home");
-        } else {
-          cls.push("player");
-        }
+        if (gameWon && r === door[0] && c === door[1]) cls.push("player-home");
+        else cls.push("player");
       }
       
-      // Show active keys (not collected yet)
       if (!showingSolution) {
         activeKeys.forEach(k => {
-          if (k && k[0] === r && k[1] === c) {
-            cls.push("key");
-          }
+          if (k && k[0] === r && k[1] === c) cls.push("key");
         });
       }
       
-      // Show door
       if (r === door[0] && c === door[1] && !cls.includes("player-home")) {
-        if (keysCollected === 2 || showingSolution) {
-          cls.push("home");
-        } else {
-          cls.push("door");
-        }
+        if (keysCollected === 2 || showingSolution) cls.push("home");
+        else cls.push("door");
       }
       
-      // Show hit cell
-      if (hitCell && hitCell[0] === r && hitCell[1] === c) {
-        cls = ["hit"];
-      }
+      if (hitCell && hitCell[0] === r && hitCell[1] === c) cls = ["hit"];
       
       html += `<td class="${cls.join(" ")}"></td>`;
     }
@@ -725,27 +604,21 @@ function render() {
   document.getElementById("maze").innerHTML = html;
 }
 
-// Update status display
 function updateStatus() {
   document.getElementById("keyCount").textContent = keysCollected;
   document.getElementById("attempts").textContent = attempts;
   updateTimerDisplay();
 }
 
-// Timer functions
 function startTimer() {
   timerInterval = setInterval(() => {
     if (!gameActive) {
       clearInterval(timerInterval);
       return;
     }
-    
     timeLeft--;
     updateTimerDisplay();
-    
-    if (timeLeft <= 0) {
-      gameOver();
-    }
+    if (timeLeft <= 0) gameOver();
   }, 1000);
 }
 
@@ -756,21 +629,12 @@ function updateTimerDisplay() {
   const timerElement = document.getElementById("timer");
   
   timerElement.textContent = timerDisplay;
-  
-  // Remove all timer classes
   timerElement.classList.remove('timer-warning', 'timer-critical');
   
-  // Add warning/critical classes based on time
-  if (timeLeft <= 30) {
-    timerElement.classList.add('timer-critical');
-  } else if (timeLeft <= 60) {
-    timerElement.classList.add('timer-warning');
-  }
+  if (timeLeft <= 30) timerElement.classList.add('timer-critical');
+  else if (timeLeft <= 60) timerElement.classList.add('timer-warning');
   
-  // Show solution button when time runs out
-  if (timeLeft <= 0) {
-    document.getElementById("solutionBtn").style.display = "inline-block";
-  }
+  if (timeLeft <= 0) document.getElementById("solutionBtn").style.display = "inline-block";
 }
 
 function gameOver() {
@@ -780,11 +644,8 @@ function gameOver() {
   
   document.getElementById("winMessage").innerHTML = 
     `<div class="lose-message">⏰ TIME'S UP! You're out! Try again?</div>`;
-  
-  // Show solution button
   document.getElementById("solutionBtn").style.display = "inline-block";
   
-  // Auto-restart after 3 seconds
   setTimeout(() => {
     if (!showingSolution) {
       document.getElementById("winMessage").innerHTML = "";
@@ -793,63 +654,73 @@ function gameOver() {
   }, 3000);
 }
 
-// Show solution path
+function toggleSolution() {
+  if (!showingSolution) {
+    showSolution();
+    document.getElementById("solutionBtn").textContent = "Hide Solution";
+  } else {
+    showingSolution = false;
+    solutionPath = [];
+    render();
+    document.getElementById("solutionBtn").textContent = "Show Solution";
+    document.getElementById("winMessage").innerHTML = "";
+  }
+}
+
 function showSolution() {
   showingSolution = true;
   solutionPath = [];
   
-  // Find path from start to key1 to key2 to home using BFS
-  const findPath = (start, end) => {
-    const queue = [[start, [start]]];
-    const visited = new Set([`${start[0]},${start[1]}`]);
-    
-    while (queue.length > 0) {
-      const [[r, c], path] = queue.shift();
-      
-      if (r === end[0] && c === end[1]) {
-        return path;
-      }
-      
-      for (const [dr, dc] of DIRS) {
-        const nr = r + dr;
-        const nc = c + dc;
-        const key = `${nr},${nc}`;
-        
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size && 
-            maze[nr][nc] === 1 && !visited.has(key)) {
-          visited.add(key);
-          queue.push([[nr, nc], [...path, [nr, nc]]]);
-        }
-      }
+  const pathToKey1Direct = findShortestPath([0, 0], keys[0]);
+  const pathToKey2Direct = findShortestPath([0, 0], keys[1]);
+  
+  let firstKey, secondKey;
+  
+  const path1_2 = findShortestPath(keys[0], keys[1]);
+  const path2_1 = findShortestPath(keys[1], keys[0]);
+  
+  if (pathToKey1Direct.length > 0 && path1_2.length > 0) {
+    const pathToHome1 = findShortestPath(keys[1], door);
+    if (pathToHome1.length > 0) {
+      firstKey = keys[0];
+      secondKey = keys[1];
+      solutionPath = [...pathToKey1Direct, ...path1_2.slice(1), ...pathToHome1.slice(1)];
     }
-    return [];
-  };
+  }
   
-  // Path: Start -> Key1 -> Key2 -> Home
-  const pathToKey1 = findPath([0, 0], keys[0]);
-  const pathToKey2 = findPath(keys[0], keys[1]);
-  const pathToHome = findPath(keys[1], door);
+  if (solutionPath.length === 0 && pathToKey2Direct.length > 0 && path2_1.length > 0) {
+    const pathToHome2 = findShortestPath(keys[0], door);
+    if (pathToHome2.length > 0) {
+      firstKey = keys[1];
+      secondKey = keys[0];
+      solutionPath = [...pathToKey2Direct, ...path2_1.slice(1), ...pathToHome2.slice(1)];
+    }
+  }
   
-  // Combine all paths (remove duplicates at junctions)
-  solutionPath = [
-    ...pathToKey1,
-    ...pathToKey2.slice(1), // Skip first element (same as last of pathToKey1)
-    ...pathToHome.slice(1)  // Skip first element (same as last of pathToKey2)
-  ];
+  if (solutionPath.length === 0) {
+    solutionPath = [
+      ...(pathToKey1Direct.length > 0 ? pathToKey1Direct : pathToKey2Direct),
+      ...(path1_2.length > 0 ? path1_2.slice(1) : path2_1.slice(1))
+    ];
+  }
   
   render();
   
   const pathLength = solutionPath.length;
+  const keyOrder = firstKey ? 
+    `📍 Path: Start (0,0) → 🔑 (${firstKey[0]},${firstKey[1]}) → 🔑 (${secondKey[0]},${secondKey[1]}) → 🏠 (${size-1},${size-1})` :
+    `Follow the green path to collect both keys and reach home`;
+  
   document.getElementById("winMessage").innerHTML = 
     `<div class="solution-text">
       ✨ <strong>SOLUTION REVEALED</strong> ✨<br>
       🟢 Green path = Correct route (${pathLength} steps)<br>
       🟡 Yellow highlight = Key locations<br>
-      Follow: Start → 🔑 Key 1 → 🔑 Key 2 → 🏠 Home
+      ${keyOrder}<br>
+      <strong>Click any difficulty button to try the SAME puzzle again!</strong>
     </div>`;
 }
 
-// Start with medium difficulty
 startGame(6);
 </script>
 </body>

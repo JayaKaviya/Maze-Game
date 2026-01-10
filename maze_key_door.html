@@ -143,6 +143,22 @@ td {
   transform: translateY(-50%);
 }
 
+.player-key::before { 
+  content: "🔑"; 
+  position: absolute; 
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.player-key::after { 
+  content: "👤"; 
+  position: absolute; 
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .hit { 
   background: #dc2626 !important;
   animation: shake 0.3s;
@@ -221,6 +237,7 @@ td {
     <p><strong>🎯 Mission:</strong> Collect 2 keys (🔑) and reach home (🏠)</p>
     <p><strong>⚠️ Rules:</strong> The maze is invisible! Hit a wall = restart from beginning</p>
     <p><strong>🎮 Controls:</strong> Use Arrow Keys (↑ ↓ ← →) to navigate</p>
+    <p><strong>💡 Tip:</strong> You can walk over home without all keys - just keep exploring!</p>
   </div>
 
   <div class="status" id="status">
@@ -529,6 +546,7 @@ function move(dr, dc) {
 }
 
 function checkCollision() {
+  // Check for key collection
   activeKeys.forEach((k, i) => {
     if (k && player[0] === k[0] && player[1] === k[1]) {
       activeKeys[i] = null;
@@ -536,34 +554,27 @@ function checkCollision() {
     }
   });
 
-  if (player[0] === door[0] && player[1] === door[1]) {
-    if (keysCollected === 2) {
-      gameWon = true;
-      gameActive = false;
-      clearInterval(timerInterval);
-      
-      const minutes = Math.floor((240 - timeLeft) / 60);
-      const seconds = (240 - timeLeft) % 60;
-      const timeUsed = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      
-      document.getElementById("winMessage").innerHTML = 
-        `<div class="win-message">🎉 Victory! You completed the ${size}×${size} maze in ${timeUsed} (${attempts} attempts)!</div>`;
-      
-      document.getElementById("solutionBtn").style.display = "inline-block";
-      document.getElementById("solutionBtn").textContent = "View Solution Path";
-      
-      setTimeout(() => {
-        if (!showingSolution) startGame(size);
-      }, 4000);
-    } else {
-      attempts++;
-      setTimeout(() => {
-        resetGame();
-        render();
-        updateStatus();
-      }, 300);
-    }
+  // Only win if at home AND have both keys
+  if (player[0] === door[0] && player[1] === door[1] && keysCollected === 2) {
+    gameWon = true;
+    gameActive = false;
+    clearInterval(timerInterval);
+    
+    const minutes = Math.floor((240 - timeLeft) / 60);
+    const seconds = (240 - timeLeft) % 60;
+    const timeUsed = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    document.getElementById("winMessage").innerHTML = 
+      `<div class="win-message">🎉 Victory! You completed the ${size}×${size} maze in ${timeUsed} (${attempts} attempts)!</div>`;
+    
+    document.getElementById("solutionBtn").style.display = "inline-block";
+    document.getElementById("solutionBtn").textContent = "View Solution Path";
+    
+    setTimeout(() => {
+      if (!showingSolution) startGame(size);
+    }, 4000);
   }
+  // If at home but don't have both keys, just continue - no reset!
 }
 
 function render() {
@@ -579,17 +590,26 @@ function render() {
       }
       
       if (player[0] === r && player[1] === c) {
-        if (gameWon && r === door[0] && c === door[1]) cls.push("player-home");
-        else cls.push("player");
+        if (gameWon && r === door[0] && c === door[1]) {
+          cls.push("player-home");
+        } else {
+          cls.push("player");
+        }
       }
       
       if (!showingSolution) {
         activeKeys.forEach(k => {
-          if (k && k[0] === r && k[1] === c) cls.push("key");
+          if (k && k[0] === r && k[1] === c) {
+            if (player[0] === r && player[1] === c) {
+              cls = ["player-key"];
+            } else {
+              cls.push("key");
+            }
+          }
         });
       }
       
-      if (r === door[0] && c === door[1] && !cls.includes("player-home")) {
+      if (r === door[0] && c === door[1] && !cls.includes("player-home") && !cls.includes("player")) {
         if (keysCollected === 2 || showingSolution) cls.push("home");
         else cls.push("door");
       }

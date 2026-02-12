@@ -95,6 +95,15 @@ td {
   transition: background 0.2s;
 }
 
+/* Mobile-friendly: smaller cells on small screens */
+@media (max-width: 480px) {
+  td {
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+  }
+}
+
 .player::after { 
   content: "👤"; 
   position: absolute;
@@ -227,6 +236,88 @@ td {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
 }
+
+/* On-screen controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px auto;
+  max-width: 250px;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: 70px 70px 70px;
+  grid-template-rows: 70px 70px 70px;
+  gap: 5px;
+}
+
+.arrow-btn {
+  width: 70px;
+  height: 70px;
+  border: 3px solid #475569;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: all 0.1s;
+  touch-action: manipulation;
+}
+
+.arrow-btn:active {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  transform: scale(0.95);
+}
+
+.arrow-btn:hover {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+#up-btn {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#left-btn {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#down-btn {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+#right-btn {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.spacer {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+@media (max-width: 480px) {
+  .dpad {
+    grid-template-columns: 60px 60px 60px;
+    grid-template-rows: 60px 60px 60px;
+    gap: 4px;
+  }
+  
+  .arrow-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
+  }
+}
 </style>
 </head>
 <body>
@@ -236,7 +327,7 @@ td {
   <div class="instructions">
     <p><strong>🎯 Mission:</strong> Collect 2 keys (🔑) and reach home (🏠)</p>
     <p><strong>⚠️ Rules:</strong> The maze is invisible! Hit a wall = restart from beginning</p>
-    <p><strong>🎮 Controls:</strong> Use Arrow Keys (↑ ↓ ← →) to navigate</p>
+    <p><strong>🎮 Controls:</strong> Use Arrow Keys / On-screen buttons / Swipe</p>
     <p><strong>💡 Tip:</strong> You can walk over home without all keys - just keep exploring!</p>
   </div>
 
@@ -252,6 +343,18 @@ td {
   </div>
 
   <div id="maze"></div>
+  
+  <!-- On-screen D-pad controls -->
+  <div class="controls">
+    <div class="dpad">
+      <button class="arrow-btn" id="up-btn">↑</button>
+      <button class="arrow-btn" id="left-btn">←</button>
+      <div class="spacer"></div>
+      <button class="arrow-btn" id="right-btn">→</button>
+      <button class="arrow-btn" id="down-btn">↓</button>
+    </div>
+  </div>
+  
   <div id="winMessage"></div>
 </div>
 
@@ -271,6 +374,12 @@ let showingSolution = false;
 let solutionPath = [];
 
 const DIRS = [[-1,0], [1,0], [0,-1], [0,1]];
+
+// Touch/Swipe support
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
 
 // Start new game
 function startGame(n) {
@@ -511,6 +620,7 @@ function resetGame() {
   document.getElementById("winMessage").innerHTML = "";
 }
 
+// Keyboard controls
 document.addEventListener("keydown", e => {
   if (gameWon || !gameActive) return;
   const map = {ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]};
@@ -518,6 +628,74 @@ document.addEventListener("keydown", e => {
     e.preventDefault();
     move(...map[e.key]);
   }
+});
+
+// Touch/Swipe controls
+document.addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
+}, false);
+
+document.addEventListener('touchend', e => {
+  if (gameWon || !gameActive) return;
+  
+  touchEndX = e.changedTouches[0].screenX;
+  touchEndY = e.changedTouches[0].screenY;
+  handleSwipe();
+}, false);
+
+function handleSwipe() {
+  const deltaX = touchEndX - touchStartX;
+  const deltaY = touchEndY - touchStartY;
+  const minSwipeDistance = 30; // Minimum distance for a swipe
+  
+  // Determine if it's a horizontal or vertical swipe
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    // Horizontal swipe
+    if (Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) {
+        move(0, 1); // Right
+      } else {
+        move(0, -1); // Left
+      }
+    }
+  } else {
+    // Vertical swipe
+    if (Math.abs(deltaY) > minSwipeDistance) {
+      if (deltaY > 0) {
+        move(1, 0); // Down
+      } else {
+        move(-1, 0); // Up
+      }
+    }
+  }
+}
+
+// On-screen button controls
+document.getElementById('up-btn').addEventListener('click', () => {
+  if (!gameWon && gameActive) move(-1, 0);
+});
+
+document.getElementById('down-btn').addEventListener('click', () => {
+  if (!gameWon && gameActive) move(1, 0);
+});
+
+document.getElementById('left-btn').addEventListener('click', () => {
+  if (!gameWon && gameActive) move(0, -1);
+});
+
+document.getElementById('right-btn').addEventListener('click', () => {
+  if (!gameWon && gameActive) move(0, 1);
+});
+
+// Prevent button click from triggering touch events
+document.querySelectorAll('.arrow-btn').forEach(btn => {
+  btn.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+  });
+  btn.addEventListener('touchend', (e) => {
+    e.stopPropagation();
+  });
 });
 
 function move(dr, dc) {
